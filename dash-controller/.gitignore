@@ -1,0 +1,9 @@
+build/
+components/lvgl__lvgl/demos/
+components/lvgl__lvgl/docs/
+components/lvgl__lvgl/examples/
+managed_components/
+sdkconfig.old
+*.stl
+*.x3g
+*.3mf

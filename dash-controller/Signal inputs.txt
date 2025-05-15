@@ -1,0 +1,15 @@
+Signal inputs:
+lt grn - parking brake
+wht - low fuel
+blue - low coolant
+brn dbl white stripe - 12V
+
+blower controller
+brown - 12V
+yellow - low
+tan - medium low
+lt blue - medium
+high - orange
+black - ground
+
+
