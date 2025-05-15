@@ -15,20 +15,6 @@ module sideShape() {
     cylinder(h = thickness, r = outerRadius);
 }
 
-module rightTop() {
-  mirror([1, 0, 0]){
-    cube([frontEdgeLength, 10, thickness]);
-    translate([frontEdgeLength, outerRadius, 0])
-      cylinder(h = thickness, r = outerRadius);
-  }
-}
-
-module leftTop() {
-  cube([930, 10, thickness]);
-    translate([940, outerRadius, 0])
-      cylinder(h = thickness, r = outerRadius);
-}
-
 
 //projection()
 difference() {
@@ -52,19 +38,3 @@ difference() {
     translate([714, 407 + 15, -0.1])
       cylinder(h = thickness + 0.2, d = 90);
 }
-
-
-/*
-rotate([0, 0, -centerAngle / 2]) {
-  cube([10, 407, 10]);
-
-  translate([0, 402, 0])
-    cube([2159, 10, 10], center = true);
-}
-*/
-
-/*
-translate([1130 - 369, 0, 0])
-  rotate([0, 0, -centerAngle / 2])
-    cube([10, 254, 10]);
-*/
