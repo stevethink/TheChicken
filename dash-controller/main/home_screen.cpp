@@ -778,7 +778,7 @@ static void main_create(lv_obj_t * parent)
     img = lv_img_create(panel);
     // Set the image source to the C array image
     lv_img_set_src(img, &HVAC_icons_bar);  // Use the LVGL Image Converter C array here
-    lv_obj_align_to(img, temp_slider, LV_ALIGN_BOTTOM_MID, 0, 50);
+    lv_obj_align_to(img, temp_slider, LV_ALIGN_BOTTOM_MID, 0, 60);
 
     // Create the airflow zone slider
     lv_obj_t *zone_slider = lv_slider_create(panel);
@@ -790,7 +790,7 @@ static void main_create(lv_obj_t * parent)
 //    lv_obj_set_style_bg_opa(zone_slider, LV_OPA_50, LV_PART_KNOB);  // Make knob opaque
     lv_obj_set_style_radius(zone_slider, LV_RADIUS_CIRCLE, LV_PART_KNOB);  // Make knob circular
 
-    lv_obj_align_to(zone_slider, img, LV_ALIGN_BOTTOM_MID, 0, 40);
+    lv_obj_align_to(zone_slider, img, LV_ALIGN_BOTTOM_MID, 0, 46);
     lv_obj_add_event_cb(zone_slider, hvac::zone_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
