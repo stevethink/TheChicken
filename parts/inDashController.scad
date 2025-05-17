@@ -15,9 +15,7 @@ do_mount_size = [95, 51.7, mount_thickness];
 frame_size = [110, 192, 0];
 frame_height = 11 + 2 * mount_thickness;
 
-module pcb() {
-  cube(pcb_size);
-}
+explode = true;
 
 module gps_mount() {
   difference() {
@@ -43,6 +41,8 @@ module pcb_bosses(diameter, height) {
 }
 
 module mount() {
+  rotate([0, 0, -90])
+    translate([-mount_size[0] / 2, -mount_size[1] / 2, 0])
   difference() {
     union() {
       cube(mount_size);
@@ -193,67 +193,27 @@ module frame_template() {
   }
 }
 
-module cam_screen_mount() {
-  difference() {
-    union() {
-      hull() {
-        cylinder(12 + mount_thickness, d = 12.3 + 2 * mount_thickness);
-        for (i = [0, 1])
-          mirror([i, 0, 0])
-            translate([30, 20, 0])
-              cube([mount_thickness, mount_thickness, 12 + mount_thickness]);
-  //      translate([-(12.3 + 2 * mount_thickness) / 2, 0, 0])
-  //        cube([12.3 + 2 * mount_thickness, 30, 12 + mount_thickness]);
-      }
-      
-      hull() {
-        translate([-(12 + mount_thickness) / 2, 0, 10]) {
-          translate([0, 12.3 / 2 - mount_thickness, 0]) 
-            cube([12 + mount_thickness, mount_thickness, mount_thickness]);              
-    
-          translate([0, 20, 0]) {
-            cube([12 + mount_thickness, mount_thickness, mount_thickness]);
-            translate([0, 0, 30]) 
-              cube([12 + mount_thickness, mount_thickness, mount_thickness]);              
-          }
-        }
-      }
-    }
-    translate([0, 0, -0.1]) {
-      cylinder(12, d = 12.3);
-      cylinder(20, d = 5);
-    }
-    for (i = [0, 1])
-      mirror([i, 0, 0])
-        translate([25, 22.7, (12 + mount_thickness) / 2])
-          rotate([90, 0, 0]) {
-            cylinder(60, d = 4.5);
-            translate([0, 0, mount_thickness])
-              cylinder(20, d = 7.7);
-          }
-    translate([0, 22.7, 35])
-      rotate([90, 0, 0]) {
-        cylinder(60, d = 4.5);
-        translate([0, 0, mount_thickness])
-          cylinder(20, d = 7.7);
-      }
-  }
-  
-  for (i = [0, 1])
-    mirror([i, 0, 0])
-      translate([4.5, -2, 0])
-        cube([2, 4, 12 + mount_thickness]);
-}
+frame_mount();
 
-mount();
+translate([0, 0, explode ? 25 : 0])
+  mount();
 
-// di_mount();
+translate([0, 3, explode ? 40 : 0])
+  rotate([0, 0, 90])
+    cube(pcb_size, center = true);
 
-//do_mount();
+translate([-di_mount_size[0] / 2, -di_mount_size[1] / 2 - 27, explode ? 60 : 0])
+  rotate([180, 0, 90])
+    di_mount();
 
-// gps_mount();
+translate([do_mount_size[0] / 2 - 10, do_mount_size[1] / 2 + 18, explode ? 77 : 0])
+  rotate([180, 0, -90])
+    do_mount();
 
-// frame_mount();
+translate([20, -53, explode ? 72 : 0])
+  rotate([180, 0, -90])
+    gps_mount();
+
 
 //translate([0, 55, 0])
 //cube([2, 2, 7.8]);
@@ -273,7 +233,6 @@ difference() {
 }
 */
 
-// cam_screen_mount();
 
 // spacers
 //difference() {
