@@ -8,7 +8,6 @@ centerAngle = 22;
 outerRadius = 190;
 frontEdgeLength = 940;
 
-
 module sideShape() {
   cube([frontEdgeLength, 10, thickness]);
   translate([frontEdgeLength, outerRadius, 0])
@@ -16,25 +15,53 @@ module sideShape() {
 }
 
 
-//projection()
-difference() {
-  hull()
-  intersection() {
-    union() { 
-      sideShape();
-      mirror([1, 0, 0])
-        rotate([0, 0, centerAngle])
-          sideShape();
-      rotate([0, 0, -centerAngle / 2])
-        translate([-2159 / 2, 402, 0])
-          cube([2159, 10, thickness]);
-    }
+module top() {
+  difference() {
+    hull() intersection() {
+      union() { 
+        sideShape();
+        mirror([1, 0, 0])
+          rotate([0, 0, centerAngle])
+            sideShape();
+        rotate([0, 0, -centerAngle / 2])
+          translate([-2159 / 2, 402, 0])
+            cube([2159, 10, thickness]);
+      }
 
-    rotate([0, 0, -centerAngle / 2])
-      translate([-1100, 0, 0])
-        cube([2200, 407, thickness]);
+      rotate([0, 0, -centerAngle / 2])
+        translate([-1100, 0, 0])
+          cube([2200, 370, thickness]);
+    }
+    hull() rotate([0, 0, -centerAngle / 2])
+      for (i = [0, 1])
+        translate([1100 - (i * 711), 370, -1]) {
+          translate([-178 - 25, 0, 0])
+            cube([50, 50, thickness + 2]);
+          translate([-178, -75, 0])
+            cylinder(h = thickness + 2, d = 50);
+        }
   }
-  rotate([0, 0, -centerAngle / 2])
-    translate([714, 407 + 15, -0.1])
-      cylinder(h = thickness + 0.2, d = 90);
 }
+
+module topLeft() {
+  intersection() {
+    top();
+    rotate([0, 0, -centerAngle / 2])
+      cube([1200, 370, thickness]);
+  }
+}
+
+module topRight() {
+  intersection() {
+    top();
+    rotate([0, 0, -centerAngle / 2])
+      mirror([1, 0, 0])
+        cube([1200, 370, thickness]);
+  }
+}
+
+//projection()
+top();
+//topRight();
+//topLeft();
+

@@ -193,6 +193,22 @@ module frame_template() {
   }
 }
 
+module test_stand() {
+  difference() {
+    cube(frame_size + [20, 10, 5], center = true);
+    translate([0, 0, -10])
+      frame_shape(13, 0, frame_size + [2 * mount_thickness + 1.9, -8, 35]);
+  }
+  
+  for (i = [0, 1])
+    mirror([0, i, 0])
+      translate([0, frame_size[1] / 2 + 0.5, 70])
+        cube([frame_size[0], 8, 140], center = true);
+}
+
+// test_stand();
+
+/*
 frame_mount();
 
 translate([0, 0, explode ? 25 : 0])
@@ -201,11 +217,13 @@ translate([0, 0, explode ? 25 : 0])
 translate([0, 3, explode ? 40 : 0])
   rotate([0, 0, 90])
     cube(pcb_size, center = true);
+*/
 
-translate([-di_mount_size[0] / 2, -di_mount_size[1] / 2 - 27, explode ? 60 : 0])
-  rotate([180, 0, 90])
+//translate([-di_mount_size[0] / 2, -di_mount_size[1] / 2 - 27, explode ? 60 : 0])
+//  rotate([180, 0, 90])
     di_mount();
 
+/*
 translate([do_mount_size[0] / 2 - 10, do_mount_size[1] / 2 + 18, explode ? 77 : 0])
   rotate([180, 0, -90])
     do_mount();
@@ -213,7 +231,7 @@ translate([do_mount_size[0] / 2 - 10, do_mount_size[1] / 2 + 18, explode ? 77 : 
 translate([20, -53, explode ? 72 : 0])
   rotate([180, 0, -90])
     gps_mount();
-
+*/
 
 //translate([0, 55, 0])
 //cube([2, 2, 7.8]);
