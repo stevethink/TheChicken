@@ -792,6 +792,14 @@ static void main_create(lv_obj_t * parent)
 
     lv_obj_align_to(zone_slider, img, LV_ALIGN_BOTTOM_MID, 0, 46);
     lv_obj_add_event_cb(zone_slider, hvac::zone_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+
+        // Create the blower off button
+    lv_obj_t *blower_off_btn = lv_btn_create(panel);
+    lv_obj_set_size(blower_off_btn, 100, 50);
+    lv_obj_t *blower_off_label = lv_label_create(blower_off_btn);
+    lv_label_set_text(blower_off_label, "A/C OFF");
+    lv_obj_center(blower_off_label);
+    lv_obj_add_event_cb(blower_off_btn, relays::btn_event_cb, LV_EVENT_CLICKED, encode_action(i,"on"));
 }
 
 #if 0
