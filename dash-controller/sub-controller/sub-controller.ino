@@ -2,13 +2,17 @@
 #include <TinyGPS++.h>
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
+#include <PicoSoftwareSerial.h>
+
+// Create a software serial port on GP4 (TX) and GP5 (RX)
+SoftwareSerial softSerial(5, 4);  // RX, TX
 
 // The TinyGPS++ object
 TinyGPSPlus gps;
 
 #define I2C_SLAVE_ADDRESS 0x42
-#define SDA_PIN_HOST 0
-#define SCL_PIN_HOST 1
+#define SDA_PIN_HOST 14
+#define SCL_PIN_HOST 15
 
 // Create a PCA9685 instance on the default I2C address 0x40.
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40, Wire1);
@@ -20,6 +24,7 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40, Wire1);
 #define SERVO_FREQ 60 // Analog servos run at ~60 Hz updates
 #define SERVO_RANGE 1000
 
+const int LED_PIN = 25;
 const size_t bufferSize = 1024;
 char jsonRxBuffer[bufferSize];
 uint16_t iRxBuffer = 0;
@@ -51,6 +56,10 @@ void parseJsonRxBuffer() {
     return;
   }
 
+  if (iTxBuffer != 0) {
+    return;
+  }
+
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, jsonRxBuffer);
 
@@ -65,17 +74,17 @@ void parseJsonRxBuffer() {
     return;
   }
 
-  if (doc.containsKey("servo")) {
-    if (!doc["servo"].containsKey("num")) {
+  if (doc["servo"]) {
+    if (!doc["servo"]["num"]) {
       txMessage("{\"error\":\"missing servo num value\"}");
       return;
     }
-    uint8_t servoNum = doc["servo"]["num"];
+    uint8_t servoNum = doc["servo"]["num"].as<uint8_t>();
     if (servoNum > 15) {
       txMessage("{\"error\":\"servo num out of range\"}");
       return;
     }
-    if (!doc["servo"].containsKey("pulse")) {
+    if (!doc["servo"]["pulse"]) {
       txMessage("{\"error\":\"missing servo pulse value\"}");
       return;
     }
@@ -87,8 +96,8 @@ void parseJsonRxBuffer() {
     pwm.writeMicroseconds(servoNum, denormalizePulse(pulse));
     txMessage("{\"servo\":\"ack\"}");
   }
-  else if (doc.containsKey("relay")) {
-    if (!doc["relay"].containsKey("num")) {
+  else if (doc["relay"]) {
+    if (!doc["relay"]["num"]) {
       txMessage("{\"error\":\"missing relay num value\"}");
       return;
     }
@@ -97,7 +106,7 @@ void parseJsonRxBuffer() {
       txMessage("{\"error\":\"relay num out of range\"}");
       return;
     }
-    if (!doc["relay"].containsKey("state")) {
+    if (!doc["relay"]["state"]) {
       txMessage("{\"error\":\"missing relay state value\"}");
       return;
     }
@@ -109,41 +118,22 @@ void parseJsonRxBuffer() {
     digitalWrite(outputPins[relayNum], doc["relay"]["state"] == "on" ? LOW : HIGH);
     txMessage("{\"relay\":\"ack\"}");
   }
-  else if (doc.containsKey("ping")) {
+  else if (doc["leveler"]) {
+    char txLevelerBuffer[bufferSize];
+    size_t iTxLeveler = serializeJson(doc["leveler"], txLevelerBuffer, bufferSize);
+    if (iTxLeveler == 0) {
+      txMessage("{\"error\":\"unable to serialize leveler message\"}");
+      return;
+    }
+    softSerial.println(txLevelerBuffer);
+    Serial.println(txLevelerBuffer);
+  }
+  else if (doc["ping"]) {
     txMessage("{\"ping\":\"ack\"}");
     // force resending of current pinMap
     pinMapCurrent = 0xFF;
   }
 }
-
-/*
-void readCommands() {
-  uint32_t status = i2c_get_hw(I2C_INST)->intr_stat;
-
-  // Handle receive data
-  if (status & I2C_IC_INTR_STAT_R_RX_FULL_BITS) {
-    if (iRxBuffer < bufferSize) {
-      char c = (char)i2c_read_byte_raw(I2C_INST);
-      if (c == '\n' || c == '\r' || c == '\0') {
-        if (iRxBuffer == 0) {
-          continue;
-        }
-        jsonRxBuffer[iRxBuffer] = '\0';
-        Serial.println(jsonRxBuffer);
-        parseJsonRxBuffer();
-        iRxBuffer = 0;
-        break;
-      }
-      if (iRxBuffer >= bufferSize) {
-        iRxBuffer = 0;
-        break;
-      }
-      jsonRxBuffer[iRxBuffer++] = c;
-    }
-  }
-  i2c_get_hw(I2C_INST)->clr_rx_full = 1;
-}
-*/
 
 void receiveEvent(int howMany) {
   while (Wire.available() > 0) {
@@ -178,6 +168,7 @@ void readGPS() {
   if (iTxBuffer != 0) {
     return;
   }
+
   while (Serial2.available() > 0) {
     char c = Serial2.read();
     gps.encode(c);
@@ -200,9 +191,6 @@ void readGPS() {
       gpsDoc["gps"]["hdop"] = gps.hdop.hdop();
       iTxBuffer = serializeJson(gpsDoc, jsonTxBuffer, bufferSize);
       return;
-      // Serial.println();
-//      serializeJson(gpsDoc, Serial);
-//      Serial.println();
     }
   }
 }
@@ -227,14 +215,43 @@ void readGPIO() {
     interrupts();
     lastReportTimestamp = millis();
   }
-//    Serial.print("{\"12vInputs\":\"");
-//    Serial.print(pinMapCurrent);
-//    Serial.println("\"}");
+}
+
+void readLeveler() {
+  static char rxLevelerBuffer[bufferSize];
+  static uint16_t iRxLevelerBuffer = 0;
+
+  if (iTxBuffer != 0) {
+    return;
+  }
+
+  while (softSerial.available() > 0) {
+    char c = softSerial.read();
+    rxLevelerBuffer[iRxLevelerBuffer++] = c;
+    if (c == '\0') {
+      int len = sprintf(jsonTxBuffer, "{\"leveler\":%s}", rxLevelerBuffer);
+      iTxBuffer = len > 0 ? len : 0;
+      return;
+    }
+  }
+}
+
+void blinkLED() {
+  static unsigned long lastBlinkTimestamp = 0;
+  static bool bBlink = false;
+
+  if (millis() - lastBlinkTimestamp > 1000) {
+    digitalWrite(LED_PIN, bBlink ? HIGH : LOW);
+    bBlink = !bBlink;
+    lastBlinkTimestamp = millis();
+  }
 }
 
 void setup() {
-//  Serial.begin(115200);
+  Serial.begin(115200);
+  pinMode(LED_PIN, OUTPUT);
   Serial2.begin(9600);
+  softSerial.begin(9600);
 
   Wire.setSDA(SDA_PIN_HOST);
   Wire.setSCL(SCL_PIN_HOST);
@@ -265,4 +282,8 @@ void loop() {
   delay(10);
   readGPIO();
   delay(10);
+  readLeveler();
+  delay(10);
+
+  blinkLED();
 }
