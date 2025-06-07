@@ -1,0 +1,7 @@
+{"ping":true}
+{"relay":{"num":"1","state":"on"}}
+{"airRide":{"ping":true}}
+{"airRide":{"manual":{"right":"up"}}}
+{"airRide":{"manual":{"left":"down"}}}
+{"airRide":{"manual":"stop"}}
+

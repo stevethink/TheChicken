@@ -237,7 +237,9 @@ static esp_err_t i2c_master_init(void)
 }
 
 // Function to send data to the RP2040
-esp_err_t i2c_master_send_data(uint8_t *data, size_t len) {
+esp_err_t i2c_master_send_data(const uint8_t *data, size_t len) {
+    ESP_LOGI(TAG, "Sending data to RP2040: %.*s\n", (int)len, data);
+
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (I2C_SLAVE_ADDRESS << 1) | I2C_MASTER_WRITE, true);
@@ -246,6 +248,11 @@ esp_err_t i2c_master_send_data(uint8_t *data, size_t len) {
     esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
     return ret;
+}
+
+// Function to send a string RP2040
+esp_err_t i2c_master_send_str(const char *str) {
+    return i2c_master_send_data((const uint8_t *)str, strlen(str));
 }
 
 // Function to request data from the RP2040
@@ -257,6 +264,7 @@ esp_err_t i2c_master_request_data(uint8_t *data, size_t len) {
     i2c_master_stop(cmd);
     esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
+
     return ret;
 }
 
@@ -274,7 +282,7 @@ static void i2c_master_request_task(void *arg)
                 handle_message((char *)rx_data);
             }
         } else {
-            ESP_LOGE(TAG, "Error requesting data: %s", esp_err_to_name(ret));
+           // ESP_LOGE(TAG, "Error requesting data: %s", esp_err_to_name(ret));
         }
 
         // Wait for the next polling interval
