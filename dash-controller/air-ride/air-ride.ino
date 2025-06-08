@@ -164,7 +164,6 @@ void setMode(const JsonVariant & m) {
     send("{\"error\":\"unexpected mode\"}");
     return;
   }
-  send("{\"ack\":\"mode\"}");
 }
 
 void setConfig(const JsonVariant & json) {
@@ -182,7 +181,6 @@ void setConfig(const JsonVariant & json) {
   }
 
   saveConfig();
-  send("{\"ack\":\"config\"}");
 }
 
 void sendStatus() {
@@ -255,8 +253,6 @@ void handleManual(const JsonVariant & json) {
 
     digitalWrite(outputPins[left ? (up ? x_LeftInflate : x_LeftDeflate) : (up ? x_RightInflate : x_RightDeflate)], LOW);
   }
-
-  send("{\"manual\":\"ack\"}");  
 }
 
 void parseJsonRxBuffer() {
@@ -368,7 +364,7 @@ void blinkLED() {
   static unsigned long lastBlinkTimestamp = 0;
   static bool bBlink = false;
 
-  if (millis() - lastBlinkTimestamp > 500) {
+  if (millis() - lastBlinkTimestamp > 1000) {
     digitalWrite(LED_PIN, bBlink ? HIGH : LOW);
     bBlink = !bBlink;
     lastBlinkTimestamp = millis();
@@ -382,6 +378,8 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   Serial2.setTX(4);
   Serial2.setRX(5);
+  Serial2.setCTS(UART_PIN_NOT_DEFINED);
+  Serial2.setRTS(UART_PIN_NOT_DEFINED);
   Serial2.begin(38400);
 
   // Initialize I2C on Wire1 using GP14 (SDA) and GP15 (SCL)

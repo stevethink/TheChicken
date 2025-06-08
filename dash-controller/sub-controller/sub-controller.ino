@@ -4,9 +4,6 @@
 #include <Adafruit_PWMServoDriver.h>
 #include <LittleFS.h>
 
-// The TinyGPS++ object
-TinyGPSPlus gps;
-
 #define I2C_SLAVE_ADDRESS 0x42
 #define SDA_PIN_HOST 12
 #define SCL_PIN_HOST 13
@@ -32,12 +29,180 @@ uint16_t iRxBuffer = 0;
 char jsonTxBuffer[bufferSize];
 uint16_t iTxBuffer = 0;
 
-bool i2cConnected = false;
-
 const uint8_t inputPins[] = {22, 21, 20, 19, 26, 18, 17, 16};
-uint8_t pinMapCurrent = 0;
+// uint8_t pinMapCurrent = 0;
 
 const uint8_t outputPins[] = {7, 6, 11, 10};
+
+void txMessage(const char * msg) {
+  noInterrupts();
+  int len = sprintf(jsonTxBuffer, "%s", msg);
+  iTxBuffer = (len > 0 ? len : 0);
+  interrupts();
+}
+
+void txJson(const JsonVariant& json) {
+  noInterrupts();
+  iTxBuffer = serializeJson(json, jsonTxBuffer, bufferSize);
+  interrupts();
+}
+
+class Gps {
+public:
+  void init() {
+    Serial2.setTX(8);
+    Serial2.setRX(9);
+    Serial2.begin(9600);
+  };
+
+  void process() {
+    if (isReady) {
+      return;
+    }
+    while (Serial2.available() > 0) {
+      char c = Serial2.read();
+      gps.encode(c);
+      if (gps.location.isUpdated()) {
+        isReady = true;
+        // send();
+        return;
+      }
+    }
+  };
+
+  bool ready() {
+    return isReady;
+  };
+
+  void send() {
+    if (isReady){
+      JsonDocument gpsDoc;
+      gpsDoc["gps"]["location"]["lat"] = gps.location.lat();
+      gpsDoc["gps"]["location"]["long"] = gps.location.lng();
+      gpsDoc["gps"]["timestamp"]["year"] = gps.date.year();
+      gpsDoc["gps"]["timestamp"]["month"] = gps.date.month();
+      gpsDoc["gps"]["timestamp"]["day"] = gps.date.day();
+      gpsDoc["gps"]["timestamp"]["hour"] = gps.time.hour();
+      gpsDoc["gps"]["timestamp"]["minute"] = gps.time.minute();
+      gpsDoc["gps"]["timestamp"]["second"] = gps.time.second();
+      gpsDoc["gps"]["course"]["deg"] = gps.course.deg();
+      gpsDoc["gps"]["altitude"]["feet"] = gps.altitude.feet();
+      gpsDoc["gps"]["altitude"]["meters"] = gps.altitude.meters();
+      gpsDoc["gps"]["speed"]["mph"] = (int)gps.speed.mph();
+      gpsDoc["gps"]["speed"]["kmph"] = (int)gps.speed.kmph();
+      gpsDoc["gps"]["satellites"] = gps.satellites.value();
+      gpsDoc["gps"]["hdop"] = gps.hdop.hdop();
+
+      txJson(gpsDoc);
+      isReady = false;
+    }
+  };
+
+private:
+  // The TinyGPS++ object
+  TinyGPSPlus gps;
+  bool isReady = false;
+};
+
+
+class AirRide {
+public:
+  void init() {
+    Serial1.setTX(0);
+    Serial1.setRX(1);
+    Serial1.begin(38400);
+  };
+
+  void process() {
+//    if (isReady) {
+  //    return;
+    //}
+
+    while (Serial1.available() > 0) {
+      char c = Serial1.read();
+      if (c == '\n' || c == '\r' || c == '\0') {
+        if (iRxAirRideBuffer == 0) {
+          continue;
+        }
+        rxAirRideBuffer[iRxAirRideBuffer] = '\0';
+        isReady = true;
+       // Serial.println();
+        return;
+      }
+      if (iRxAirRideBuffer >= bufferSize) {
+        iRxAirRideBuffer = 0;
+      }
+      rxAirRideBuffer[iRxAirRideBuffer++] = c;
+  //    Serial.print(c);
+    }
+
+    if (millis() - lastStatusReq > 2000) {
+      sendStatusReq();
+    }
+  };
+
+  bool ready() {
+    return isReady;
+  };
+
+  void send() {
+    // txMessage(rxAirRideBuffer);
+    noInterrupts();
+    int len = sprintf(jsonTxBuffer, "{\"airRide\":%s}", rxAirRideBuffer);
+    iTxBuffer = (len > 0 ? len : 0);
+    Serial.println(jsonTxBuffer);
+    interrupts();
+    iRxAirRideBuffer = 0;
+    isReady = false;
+    sendStatusReq();
+  };
+
+private:
+  char rxAirRideBuffer[bufferSize];
+  uint16_t iRxAirRideBuffer = 0;
+  bool isReady = false;
+  unsigned long lastStatusReq = 0;
+
+  void sendStatusReq() {
+    Serial1.println("{\"req\":\"status\"}");
+    lastStatusReq = millis();
+  };
+};
+
+/*
+bool readAirRide() {
+  static unsigned long startedTimestamp = millis();
+  static char rxAirRideBuffer[bufferSize];
+  static uint16_t iRxAirRideBuffer = 0;
+
+  while (Serial1.available() > 0) {
+    char c = Serial1.read();
+    if (c == '\n' || c == '\r' || c == '\0') {
+      if (iRxAirRideBuffer == 0) {
+        continue;
+      }
+      rxAirRideBuffer[iRxAirRideBuffer] = '\0';
+      noInterrupts();
+      int len = sprintf(jsonTxBuffer, "{\"airRide\":%s}", rxAirRideBuffer);
+      iTxBuffer = (len > 0 ? len : 0);
+      Serial.println(jsonTxBuffer);
+      Serial.println(iTxBuffer);
+      interrupts();
+      iRxAirRideBuffer = 0;
+
+      return true;
+    }
+    if (iRxAirRideBuffer >= bufferSize) {
+      iRxAirRideBuffer = 0;
+
+      return false;
+    }
+    rxAirRideBuffer[iRxAirRideBuffer++] = c;
+  }
+
+  return false;
+}
+*/
 
 struct Servo {
   int pulse = 0;
@@ -52,19 +217,6 @@ int denormalizePulse(int pulse) {
 
 int normalizePulse(int pulse) {
   return map(pulse, SERVOMIN, SERVOMAX, 0, SERVO_RANGE);
-}
-
-void txMessage(const char * msg) {
-  noInterrupts();
-  int len = sprintf(jsonTxBuffer, "%s", msg);
-  iTxBuffer = len > 0 ? len : 0;
-  interrupts();
-}
-
-void txJson(const JsonVariant& json) {
-  noInterrupts();
-  iTxBuffer = serializeJson(json, jsonTxBuffer, bufferSize);
-  interrupts();
 }
 
 void handleServo(const JsonVariant& servo) {
@@ -131,7 +283,7 @@ void parseJsonRxBuffer() {
   if (error) {
     noInterrupts();
     int len = sprintf(jsonTxBuffer, "{\"error\":\"%s\"}", error.f_str());
-    iTxBuffer = len > 0 ? len : 0;
+    iTxBuffer = (len > 0 ? len : 0);
     interrupts();
     return;
   }
@@ -236,7 +388,7 @@ void parseJsonRxBuffer() {
   if (doc["ping"]) {
     txMessage("{\"ping\":\"ack\"}");
     // force resending of current pinMap
-    pinMapCurrent = 0xFF;
+    // pinMapCurrent = 0xFF;
   }
 }
 
@@ -278,43 +430,7 @@ void readHost() {
 }
 */
 
-void readAirRide() {
-  static char rxAirRideBuffer[bufferSize];
-  static uint16_t iRxAirRideBuffer = 0;
-
-  if (iTxBuffer != 0) {
-    return;
-  }
-
-  Serial.println("readAirRide started");
-
-  while (Serial1.available() > 0) {
-    char c = Serial1.read();
-    if (c == '\n' || c == '\r' || c == '\0') {
-      if (iRxAirRideBuffer == 0) {
-        continue;
-      }
-      rxAirRideBuffer[iRxAirRideBuffer] = '\0';
-      noInterrupts();
-      int len = sprintf(jsonTxBuffer, "{\"airRide\":%s}", rxAirRideBuffer);
-      iTxBuffer = len > 0 ? len : 0;
-      interrupts();
-      Serial.println("readAirRide succeeded");
-      // Serial.println(jsonTxBuffer);
-      iRxAirRideBuffer = 0;
-      break;
-    }
-    if (iRxAirRideBuffer >= bufferSize) {
-      iRxAirRideBuffer = 0;
-      break;
-    }
-    rxAirRideBuffer[iRxAirRideBuffer++] = c;
-  }
-}
-
 void requestEvent() {
-  i2cConnected = true;
-
   for (uint16_t i = 0; i < iTxBuffer; i++) {
     Wire.write(jsonTxBuffer[i]);
   }
@@ -322,77 +438,45 @@ void requestEvent() {
   iTxBuffer = 0;
 }
 
+
+void readGPIO() {
+  uint8_t pinMap = 0;
+
+  for (int i = 0; i < sizeof(inputPins); i++) {
+    pinMap |= (digitalRead(inputPins[i]) == HIGH ? 1 : 0) << i;
+  }
+
+  noInterrupts();
+  int len = sprintf(jsonTxBuffer, "{\"12vInputs\":%d}", pinMap);
+  iTxBuffer = (len > 0 ? len : 0);
+  interrupts();
+}
+
 /*
-void sendToHost() {
-  if (i2cConnected || (0 == iTxBuffer)) {
-    return;
-  }
-
-  Serial.println(jsonTxBuffer);
-  iTxBuffer = 0;
-}
-*/
-
-bool readGPS() {
-  if (iTxBuffer != 0) {
-    return false;
-  }
-
-  while (Serial2.available() > 0) {
-    char c = Serial2.read();
-    gps.encode(c);
-    if (gps.location.isUpdated()){
-      JsonDocument gpsDoc;
-      gpsDoc["gps"]["location"]["lat"] = gps.location.lat();
-      gpsDoc["gps"]["location"]["long"] = gps.location.lng();
-      gpsDoc["gps"]["timestamp"]["year"] = gps.date.year();
-      gpsDoc["gps"]["timestamp"]["month"] = gps.date.month();
-      gpsDoc["gps"]["timestamp"]["day"] = gps.date.day();
-      gpsDoc["gps"]["timestamp"]["hour"] = gps.time.hour();
-      gpsDoc["gps"]["timestamp"]["minute"] = gps.time.minute();
-      gpsDoc["gps"]["timestamp"]["second"] = gps.time.second();
-      gpsDoc["gps"]["course"]["deg"] = gps.course.deg();
-      gpsDoc["gps"]["altitude"]["feet"] = gps.altitude.feet();
-      gpsDoc["gps"]["altitude"]["meters"] = gps.altitude.meters();
-      gpsDoc["gps"]["speed"]["mph"] = (int)gps.speed.mph();
-      gpsDoc["gps"]["speed"]["kmph"] = (int)gps.speed.kmph();
-      gpsDoc["gps"]["satellites"] = gps.satellites.value();
-      gpsDoc["gps"]["hdop"] = gps.hdop.hdop();
-
-      txJson(gpsDoc);
-
-      return true;
-    }
-  }
-
-  return false;
-}
-
 bool readGPIO() {
   static unsigned long lastReportTimestamp = 0;
   uint8_t pinMapPrevious = pinMapCurrent;
-
-  if (iTxBuffer != 0) {
-    return false;
-  }
 
   pinMapCurrent = 0;
   for (int i = 0; i < sizeof(inputPins); i++) {
     pinMapCurrent |= (digitalRead(inputPins[i]) == HIGH ? 1 : 0) << i;
   }
 
-  if (pinMapCurrent != pinMapPrevious || (i2cConnected && (millis() - lastReportTimestamp > 200))) {
+  if (pinMapCurrent != pinMapPrevious || (millis() - lastReportTimestamp > 500)) {
     noInterrupts();
     int len = sprintf(jsonTxBuffer, "{\"12vInputs\":%d}", pinMapCurrent);
-    iTxBuffer = len > 0 ? len : 0;
+    iTxBuffer = (len > 0 ? len : 0);
+    Serial.println("ReadGPIO succeeded");
+    Serial.println(iTxBuffer);
+    Serial.println(jsonTxBuffer);
     interrupts();
     lastReportTimestamp = millis();
-
     return true;
   }
 
   return false;
 }
+*/
 
 void blinkLED() {
   static unsigned long lastBlinkTimestamp = 0;
@@ -469,16 +553,15 @@ void updateServos() {
   }
 }
 
+AirRide airRide;
+Gps gps;
+
 void setup() {
   Serial.begin(115200);  
   pinMode(LED_PIN, OUTPUT);
-  Serial1.setTX(0);
-  Serial1.setRX(1);
-  Serial1.begin(38400);
 
-  Serial2.setTX(8);
-  Serial2.setRX(9);
-  Serial2.begin(9600);
+  airRide.init();
+  gps.init();
 //  softSerial.begin(9600);
 
   Wire.setSDA(SDA_PIN_HOST);
@@ -520,38 +603,54 @@ void setup() {
 }
 
 void roundRobin() {
+  static unsigned long lastTransitionTimestamp = 0;
   static uint8_t i = 0;
+  bool fTransition = false;
 
-  if (iTxBuffer != 0) {
+  airRide.process();
+  gps.process();
+
+  if (iTxBuffer != 0 || (millis() - lastTransitionTimestamp < 100)) {
     return;
   }
-
-  Serial.printf("roundRobin %d\n", i);
 
   switch (i)
   {
   case 0:
-    Serial1.println("{\"req\":\"status\"}");
+    if (airRide.ready()) {
+      fTransition = true;
+      Serial.println("roundRobin: airRide ready");
+      airRide.send();
+    }
     break;
   case 1:
-    readGPS();
+    Serial.println("roundRobin: readGPIO");
+    readGPIO();
+    fTransition = true;
     break;
   case 2:
-    readGPIO();
+    if (gps.ready()) {
+      Serial.println("roundRobin: gps ready");
+      gps.send();
+      fTransition = true;
+    }
     break;
-  case 3:
-    readAirRide();
   default:
-      break;
+    break;
   }
 
-  i = (i + 1) % 4;
+  if (fTransition || (millis() - lastTransitionTimestamp > 500)) {
+    i = (i + 1) % 3;
+    lastTransitionTimestamp = millis();
+  }
 }
 
 
 void loop() {
   parseJsonRxBuffer();
-  delay(10);
+//  readAirRide();
+//  readGPIO();
+//  readGPS();
   roundRobin();
   updateServos();
   blinkLED();
