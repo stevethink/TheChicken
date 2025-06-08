@@ -228,7 +228,8 @@ static esp_err_t i2c_master_init(void)
         .scl_io_num = I2C_MASTER_SCL_IO,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+//        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .master.clk_speed = 600000,
     };
 
     i2c_param_config(i2c_master_port, &conf);
@@ -278,7 +279,7 @@ static void i2c_master_request_task(void *arg)
         esp_err_t ret = i2c_master_request_data(rx_data, sizeof(rx_data));
         if (ret == ESP_OK) {
             if (rx_data[0] > 0) {
-                ESP_LOGI(TAG, "Received data: %s", rx_data);
+             //   ESP_LOGI(TAG, "Received data: %s", rx_data);
                 handle_message((char *)rx_data);
             }
         } else {

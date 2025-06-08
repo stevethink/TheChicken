@@ -95,6 +95,10 @@ namespace air_ride
     lv_obj_t *button[2]; // manual mode does not have a mode button
     lv_obj_t *manual_button[2][2];
 
+    lv_obj_t *left_psi_label;
+    lv_obj_t *right_psi_label;
+    lv_obj_t *tank_psi_label;    
+
     void create_mode_button(lv_obj_t *parent, uint32_t m);
     void set_mode(uint8_t new_mode);
     void send_mode_json();
@@ -528,6 +532,7 @@ void air_ride::create_manual_button(lv_obj_t *parent, bool left, bool up)
     lv_obj_center(lbl);
     lv_obj_add_event_cb(btn, manual_event_cb, LV_EVENT_PRESSED, (void *)m);
     lv_obj_add_event_cb(btn, manual_event_cb, LV_EVENT_RELEASED, (void *)m);
+//    lv_obj_add_event_cb(btn, manual_event_cb, LV_EVENT_PRESSING, (void *)m);
     manual_button[left][up] = btn;
 }
 
@@ -994,7 +999,8 @@ extern "C"
     {
         if (!json.Parse(pch))
         {
-            ESP_LOGE(TAG, "Error parsing config JSON: \n%s", json.ErrorString().Pch());
+            ESP_LOGE(TAG, "Error parsing received JSON: %s", json.ErrorString().Pch());
+            ESP_LOGE(TAG, "%s", pch);
             return;
         }
 
@@ -1054,6 +1060,35 @@ extern "C"
                 }
 
                 pJTokenServo = pJTokenServo->Next();
+            }
+        }
+        else if ((pJToken = json.Root()->Find("airRide")))
+        {
+            JToken *pJTokenPressure = pJToken->Child()->Find("pressure");
+            if (pJTokenPressure && (pJTokenPressure = pJTokenPressure->Child()))
+            {
+                char temp[16];
+                Buffer temp_buffer(temp, sizeof(temp));
+
+                if ((pJToken = pJTokenPressure->Find("left")))
+                {
+                    temp_buffer = "Left\n";
+                    temp_buffer += pJToken->ChildValue();
+                    lv_label_set_text(air_ride::left_psi_label, temp_buffer.Pch());
+                }
+                if ((pJToken = pJTokenPressure->Find("right")))
+                {
+                    temp_buffer = "Right\n";
+                    temp_buffer += pJToken->ChildValue();
+                    lv_label_set_text(air_ride::right_psi_label, temp_buffer.Pch());
+                }
+                if ((pJToken = pJTokenPressure->Find("tank")))
+                {
+                    temp_buffer = "Tank\n";
+                    temp_buffer += pJToken->ChildValue();
+                    // ESP_LOGI(TAG, "Tank: %s", pJToken->ChildValue().Pch());
+                    lv_label_set_text(air_ride::tank_psi_label, temp_buffer.Pch());
+                }
             }
         }
     }
@@ -1146,7 +1181,7 @@ static void main_create(lv_obj_t *parent)
     {
         lv_obj_t *status = lv_obj_create(panel);
         lv_obj_add_style(status, &style_indicators, 0);
-        lv_obj_set_size(status, 110, 60); // Size of the square
+        lv_obj_set_size(status, 110, 50); // Size of the square
         status_inputs::status_input[i].status = status;
         if (i == 0) {
             lv_obj_align(status, LV_ALIGN_TOP_MID, 0, 0);
@@ -1242,6 +1277,21 @@ static void main_create(lv_obj_t *parent)
 
     air_ride::create_manual_button(panel, false, false);
     lv_obj_align_to(air_ride::manual_button_obj(false, false), air_ride::manual_button_obj(false, true), LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+    air_ride::left_psi_label = lv_label_create(panel);
+    lv_label_set_text(air_ride::left_psi_label, "Left\nN/A");
+    lv_obj_set_style_text_align(air_ride::left_psi_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align_to(air_ride::left_psi_label, air_ride::manual_button_obj(true, false), LV_ALIGN_OUT_RIGHT_TOP, 20, 10);
+
+    air_ride::right_psi_label = lv_label_create(panel);
+    lv_label_set_text(air_ride::right_psi_label, "Right\nN/A");
+    lv_obj_set_style_text_align(air_ride::right_psi_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align_to(air_ride::right_psi_label, air_ride::manual_button_obj(false, false), LV_ALIGN_OUT_LEFT_TOP, -20, 10);
+
+    air_ride::tank_psi_label = lv_label_create(panel);
+    lv_label_set_text(air_ride::tank_psi_label, "Tank\nN/A");
+    lv_obj_set_style_text_align(air_ride::tank_psi_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align_to(air_ride::tank_psi_label, panel, LV_ALIGN_CENTER, 0, 30);
 
 //    air_ride::button[0] = air_ride::create_mode_button(panel, 0, "Manual");
 //    lv_obj_align_to(air_ride::button[0], air_ride::manual_button[1][0], LV_ALIGN_OUT_RIGHT_MID, 10, 0);

@@ -64,6 +64,10 @@ sensors_vec_t smoothedBuffer[avgWindowSize];
 int bufferIndex = 0;
 bool bufferFilled = false;
 
+float round1(float value) {
+   return (int)(value * 10 + 0.5) / 10.0;
+}
+
 float round2(float value) {
    return (int)(value * 100 + 0.5) / 100.0;
 }
@@ -195,12 +199,12 @@ void sendStatus() {
   doc["accel"]["y"] = round2(correctedAverage.y);
   doc["accel"]["z"] = round2(correctedAverage.z);
 
-  doc["pressure"]["left"] = round2(pressure[x_LeftADS]);
-  doc["pressure"]["right"] = round2(pressure[x_RightADS]);
-  doc["pressure"]["tank"] = round2(pressure[x_TankADS]);
+  doc["pressure"]["left"] = round(pressure[x_LeftADS]);
+  doc["pressure"]["right"] = round(pressure[x_RightADS]);
+  doc["pressure"]["tank"] = round(pressure[x_TankADS]);
 
-  serializeJson(doc, Serial);
-  Serial.println();
+//  serializeJson(doc, Serial);
+//  Serial.println();
   serializeJson(doc, Serial2);
   Serial2.println();
 }

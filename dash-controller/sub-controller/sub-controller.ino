@@ -150,7 +150,7 @@ public:
     noInterrupts();
     int len = sprintf(jsonTxBuffer, "{\"airRide\":%s}", rxAirRideBuffer);
     iTxBuffer = (len > 0 ? len : 0);
-    Serial.println(jsonTxBuffer);
+  //  Serial.println(jsonTxBuffer);
     interrupts();
     iRxAirRideBuffer = 0;
     isReady = false;
@@ -431,6 +431,15 @@ void readHost() {
 */
 
 void requestEvent() {
+  static int callCount = 0;
+  callCount++;
+  if (callCount > 16384) {
+//    Serial.println();
+    callCount = 0;
+  }
+  if (callCount % 256 == 0) {
+//    Serial.print('.');
+  }
   for (uint16_t i = 0; i < iTxBuffer; i++) {
     Wire.write(jsonTxBuffer[i]);
   }
@@ -610,7 +619,7 @@ void roundRobin() {
   airRide.process();
   gps.process();
 
-  if (iTxBuffer != 0 || (millis() - lastTransitionTimestamp < 100)) {
+  if (iTxBuffer != 0 || (millis() - lastTransitionTimestamp < 300)) {
     return;
   }
 
@@ -619,18 +628,18 @@ void roundRobin() {
   case 0:
     if (airRide.ready()) {
       fTransition = true;
-      Serial.println("roundRobin: airRide ready");
+      // Serial.println("roundRobin: airRide ready");
       airRide.send();
     }
     break;
   case 1:
-    Serial.println("roundRobin: readGPIO");
+    // Serial.println("roundRobin: readGPIO");
     readGPIO();
     fTransition = true;
     break;
   case 2:
     if (gps.ready()) {
-      Serial.println("roundRobin: gps ready");
+      // Serial.println("roundRobin: gps ready");
       gps.send();
       fTransition = true;
     }
