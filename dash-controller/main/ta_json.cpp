@@ -13,7 +13,8 @@ extern "C" {
 
 static const char *TAG = "ta_json";
 
-float pow(float x, int y);
+#include <cmath>
+// float pow(float x, int y);
 
 // inline int32_t  abs(int32_t n)                { if (n >= 0) return n; else return (-1 * n); }; 
 // inline uint16_t min(uint16_t n1, uint16_t n2) { if (n1 < n2) return n1; else return n2; };
@@ -176,35 +177,7 @@ int64_t String::StrToInt() const
 
 float String::StrToFloat() const
 {
-  float     fResult = 0.0;
-  float     fDivisor;
-  int32_t   nExponentPart;
-  uint8_t   i = 1;
-  
-  if (0 == m_cch)
-    return 0.0;
-
-  while (i < m_cch && *(m_pch + i) != '.')
-    i++;
-  
-  for (i++, fDivisor = 10.0; 
-       i < m_cch && fDivisor < 1000001.0 && *(m_pch + i) >= '0' && *(m_pch + i) <= '9'; 
-       i++, fDivisor *= 10.0)
-    fResult = fResult + ((float)(*(m_pch + i) - '0') / fDivisor);
-  
-  fResult += (float)StrToInt();
-  
-  while (i < m_cch && *(m_pch + i) != 'e' && *(m_pch + i) != 'E')
-    i++;
-  
-  if (i < m_cch)
-  {
-    i++;
-    nExponentPart = String(m_pch + i, m_cch - i).StrToInt();
-    fResult *= pow(10.0, nExponentPart);
-  }
-  
-  return fResult;
+  return (float)atof(m_pch);
 }
 
 uint64_t String::HexToInt() const

@@ -239,7 +239,7 @@ static esp_err_t i2c_master_init(void)
 
 // Function to send data to the RP2040
 esp_err_t i2c_master_send_data(const uint8_t *data, size_t len) {
-    ESP_LOGI(TAG, "Sending data to RP2040: %.*s\n", (int)len, data);
+   // ESP_LOGI(TAG, "Sending data to RP2040: %.*s\n", (int)len, data);
 
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
@@ -253,7 +253,7 @@ esp_err_t i2c_master_send_data(const uint8_t *data, size_t len) {
 
 // Function to send a string RP2040
 esp_err_t i2c_master_send_str(const char *str) {
-    return i2c_master_send_data((const uint8_t *)str, strlen(str));
+    return i2c_master_send_data((const uint8_t *)str, strlen(str) + 1);
 }
 
 // Function to request data from the RP2040
@@ -279,7 +279,7 @@ static void i2c_master_request_task(void *arg)
         esp_err_t ret = i2c_master_request_data(rx_data, sizeof(rx_data));
         if (ret == ESP_OK) {
             if (rx_data[0] > 0) {
-             //   ESP_LOGI(TAG, "Received data: %s", rx_data);
+              //  ESP_LOGI(TAG, "Received data: %s", rx_data);
                 handle_message((char *)rx_data);
             }
         } else {
@@ -288,6 +288,17 @@ static void i2c_master_request_task(void *arg)
 
         // Wait for the next polling interval
         vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+static void i2c_keep_alive_task(void *arg)
+{
+    uint8_t rx_data[1024];
+
+    ESP_LOGI(TAG, "Starting i2c_keep_alive_task");
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        i2c_master_send_str("{\"keep_alive\": true}");
     }
 }
 
@@ -601,4 +612,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Create i2c_master_request_task task");
     xTaskCreate(i2c_master_request_task, "i2c_master_request_task", EXAMPLE_LVGL_TASK_STACK_SIZE, NULL, 5, NULL);
+
+    ESP_LOGI(TAG, "Create i2c_keep_alive_task task");
+    xTaskCreate(i2c_keep_alive_task, "i2c_keep_alive_task", EXAMPLE_LVGL_TASK_STACK_SIZE, NULL, 6, NULL);    
 }

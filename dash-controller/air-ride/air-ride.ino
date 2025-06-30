@@ -59,7 +59,7 @@ Vector3 correctedAverage;
 float pressure[3];
 
 // Moving average buffer
-const int avgWindowSize = 4;
+const int avgWindowSize = 3;
 sensors_vec_t smoothedBuffer[avgWindowSize];
 int bufferIndex = 0;
 bool bufferFilled = false;
@@ -203,8 +203,8 @@ void sendStatus() {
   doc["pressure"]["right"] = round(pressure[x_RightADS]);
   doc["pressure"]["tank"] = round(pressure[x_TankADS]);
 
-//  serializeJson(doc, Serial);
-//  Serial.println();
+  serializeJson(doc, Serial);
+  Serial.println();
   serializeJson(doc, Serial2);
   Serial2.println();
 }
@@ -337,21 +337,22 @@ void parseJsonRxBuffer() {
 void readAccel() {
   static unsigned long lastReadTimestamp = 0;
 
-  if (millis() - lastReadTimestamp > 100) {
+  if (millis() - lastReadTimestamp > 20) {
     lastReadTimestamp = millis();
 
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
+    a.acceleration.x *= -1; // flip x axis
     rawAverage = getSmoothed(a.acceleration);
     correctedAverage = getCorrectionVector(rawAverage);
-    printTiltDirection(correctedAverage);
+    // printTiltDirection(correctedAverage);
   }
 }
 
 void readADS() {
   static unsigned long lastReadTimestamp = 0;
 
-  if (millis() - lastReadTimestamp > 100) {
+  if (millis() - lastReadTimestamp > 10) {
     lastReadTimestamp = millis();
 
     for (int i = 0; i < 3; i++) {

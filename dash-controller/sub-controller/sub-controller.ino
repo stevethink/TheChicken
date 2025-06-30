@@ -34,6 +34,8 @@ const uint8_t inputPins[] = {22, 21, 20, 19, 26, 18, 17, 16};
 
 const uint8_t outputPins[] = {7, 6, 11, 10};
 
+unsigned long lastMessageRx = 0;
+
 void txMessage(const char * msg) {
   noInterrupts();
   int len = sprintf(jsonTxBuffer, "%s", msg);
@@ -169,41 +171,6 @@ private:
   };
 };
 
-/*
-bool readAirRide() {
-  static unsigned long startedTimestamp = millis();
-  static char rxAirRideBuffer[bufferSize];
-  static uint16_t iRxAirRideBuffer = 0;
-
-  while (Serial1.available() > 0) {
-    char c = Serial1.read();
-    if (c == '\n' || c == '\r' || c == '\0') {
-      if (iRxAirRideBuffer == 0) {
-        continue;
-      }
-      rxAirRideBuffer[iRxAirRideBuffer] = '\0';
-      noInterrupts();
-      int len = sprintf(jsonTxBuffer, "{\"airRide\":%s}", rxAirRideBuffer);
-      iTxBuffer = (len > 0 ? len : 0);
-      Serial.println(jsonTxBuffer);
-      Serial.println(iTxBuffer);
-      interrupts();
-      iRxAirRideBuffer = 0;
-
-      return true;
-    }
-    if (iRxAirRideBuffer >= bufferSize) {
-      iRxAirRideBuffer = 0;
-
-      return false;
-    }
-    rxAirRideBuffer[iRxAirRideBuffer++] = c;
-  }
-
-  return false;
-}
-*/
-
 struct Servo {
   int pulse = 0;
   int targetPulse = 0;
@@ -287,6 +254,8 @@ void parseJsonRxBuffer() {
     interrupts();
     return;
   }
+
+  lastMessageRx = millis();
 
   if (doc["servo"]) {
     handleServo(doc["servo"]);
@@ -385,11 +354,13 @@ void parseJsonRxBuffer() {
     return;
   }
 
+/*
   if (doc["ping"]) {
     txMessage("{\"ping\":\"ack\"}");
     // force resending of current pinMap
     // pinMapCurrent = 0xFF;
   }
+  */
 }
 
 void receiveEvent(int howMany) {
@@ -410,25 +381,6 @@ void receiveEvent(int howMany) {
   }
 }
 
-/*
-void readHost() {
-  while (Serial.available() > 0) {
-    char c = Serial.read();
-    if (c == '\n' || c == '\r' || c == '\0') {
-      if (iRxBuffer == 0) {
-        continue;
-      }
-      jsonRxBuffer[iRxBuffer] = '\0';
-      break;
-    }
-    if (iRxBuffer >= bufferSize) {
-      iRxBuffer = 0;
-      break;
-    }
-    jsonRxBuffer[iRxBuffer++] = c;
-  }
-}
-*/
 
 void requestEvent() {
   static int callCount = 0;
@@ -460,32 +412,6 @@ void readGPIO() {
   iTxBuffer = (len > 0 ? len : 0);
   interrupts();
 }
-
-/*
-bool readGPIO() {
-  static unsigned long lastReportTimestamp = 0;
-  uint8_t pinMapPrevious = pinMapCurrent;
-
-  pinMapCurrent = 0;
-  for (int i = 0; i < sizeof(inputPins); i++) {
-    pinMapCurrent |= (digitalRead(inputPins[i]) == HIGH ? 1 : 0) << i;
-  }
-
-  if (pinMapCurrent != pinMapPrevious || (millis() - lastReportTimestamp > 500)) {
-    noInterrupts();
-    int len = sprintf(jsonTxBuffer, "{\"12vInputs\":%d}", pinMapCurrent);
-    iTxBuffer = (len > 0 ? len : 0);
-    Serial.println("ReadGPIO succeeded");
-    Serial.println(iTxBuffer);
-    Serial.println(jsonTxBuffer);
-    interrupts();
-    lastReportTimestamp = millis();
-    return true;
-  }
-
-  return false;
-}
-*/
 
 void blinkLED() {
   static unsigned long lastBlinkTimestamp = 0;
@@ -571,7 +497,6 @@ void setup() {
 
   airRide.init();
   gps.init();
-//  softSerial.begin(9600);
 
   Wire.setSDA(SDA_PIN_HOST);
   Wire.setSCL(SCL_PIN_HOST);
@@ -609,8 +534,54 @@ void setup() {
   }
 
   setServos();
+  lastMessageRx = millis();
 }
 
+void roundRobin() {
+//  static unsigned long lastTransitionTimestamp = 0;
+  unsigned long lastMessageTx;
+
+  static unsigned long lastAirRide = 0;
+  static unsigned long lastGPIO = 0;
+  static unsigned long lastGPS = 0;
+
+  airRide.process();
+  gps.process();
+
+  if (iTxBuffer != 0) {
+    return;
+  }
+  
+  if (millis() - lastMessageRx > 10000) {
+    watchdog_reboot(0, 0, 0);
+  }
+
+  lastMessageTx = (lastAirRide > lastGPIO ? lastAirRide : lastGPIO);
+  lastMessageTx = (lastGPS > lastMessageTx ? lastGPS : lastMessageTx);
+
+  if (millis() - lastMessageTx < 200) {
+    return;
+  }
+
+  if (lastGPS < lastGPIO && lastGPS < lastAirRide && gps.ready()) {
+    gps.send();
+    lastGPS = millis();
+    return;
+  }
+
+  if (lastAirRide < lastGPIO && airRide.ready()) {
+    airRide.send();
+    lastAirRide = millis();
+    return;
+  }
+
+  if (millis() - lastGPIO > 200) {
+    readGPIO();
+    lastGPIO = millis();
+  }
+}
+
+/*
 void roundRobin() {
   static unsigned long lastTransitionTimestamp = 0;
   static uint8_t i = 0;
@@ -619,7 +590,11 @@ void roundRobin() {
   airRide.process();
   gps.process();
 
-  if (iTxBuffer != 0 || (millis() - lastTransitionTimestamp < 300)) {
+  if (millis() - lastMessageRx > 10000) {
+//    watchdog_reboot(0, 0, 0);
+  }
+
+  if (iTxBuffer != 0 || (millis() - lastTransitionTimestamp < 50)) {
     return;
   }
 
@@ -648,12 +623,12 @@ void roundRobin() {
     break;
   }
 
-  if (fTransition || (millis() - lastTransitionTimestamp > 500)) {
+  if (fTransition || (millis() - lastTransitionTimestamp > 200)) {
     i = (i + 1) % 3;
     lastTransitionTimestamp = millis();
   }
 }
-
+*/
 
 void loop() {
   parseJsonRxBuffer();

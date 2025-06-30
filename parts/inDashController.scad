@@ -5,6 +5,7 @@ $fn = 128;
 //$fn = 16;
 
 // Parameters for both mounts
+thickness = 5.3; // Thickness of the plywood
 mount_thickness = 2.6; // Thickness of the mount
 //mount_thickness = 0.5; // Thickness of the mount
 pcb_size = [90, 97, 1.6];
@@ -46,8 +47,8 @@ module mount() {
   difference() {
     union() {
       cube(mount_size);
-      translate([pcb_size[0] / 2 + 21, pcb_size[1] / 2, 0])
-        pcb_bosses(5, 11.6);
+  //    translate([pcb_size[0] / 2 + 21, pcb_size[1] / 2, 0])
+    //    pcb_bosses(5, 11.6);
     }
     translate([mount_size[0] / 2, mount_size[1] / 2 - 2.5, -0.1])
       for (i = [0, 1])
@@ -185,6 +186,13 @@ module frame_mount() {
   }
 }
 
+module frame_mount_inside() {
+  translate([1, -1.3, -0.1])
+    frame_shape(0.2, 0, frame_size + [-9, -25, frame_height - 2 * mount_thickness - 3.1]);
+  translate([frame_size[0] / 2 - 8, 0, 0])
+    cube([13, 45, 40], center = true);   
+}
+
 module frame_template() {
   difference() {
     cube(frame_size + [20, 10, 5], center = true);
@@ -206,14 +214,115 @@ module test_stand() {
         cube([frame_size[0], 8, 140], center = true);
 }
 
+
+module cam_screen_mount() {
+  difference() {
+    translate([-17, -15, 0])
+      cube([45, 45, 45]);
+
+    translate([0, 0, -0.1]) {
+      cylinder(6, d = 18.4);
+      cylinder(13, d = 12.3);
+      cylinder(46, d = 5);
+    }
+    
+    translate([0, 0, 22])
+      cylinder(50, d = 12.3);
+    
+    translate([5.5, 48, 22.5])
+      for (i = [0, 1]) for (j = [0, 1])
+        mirror([i, 0, 0])
+          mirror([0, 0, j])
+            translate([18, 0, 18])
+              rotate([90, 0, 0])
+                cylinder(70, d = 5.2);
+    /*
+
+    translate([0, 22.7, 35])
+      rotate([90, 0, 0]) {
+        cylinder(60, d = 4.5);
+        translate([0, 0, mount_thickness])
+          cylinder(20, d = 7.7);
+      }
+    */
+  }
+  
+  for (i = [0, 1])
+    mirror([i, 0, 0])
+      translate([4.5, -2, 6])
+        cube([2, 4, 12 + mount_thickness]);
+}
+
+module headlight_switch_cover() {
+  across_flats = 17.1;  // Distance between two opposing flat sides
+  thickness = 3;      // Nut thickness
+  height = 6;
+
+  // Calculate the circumscribed circle radius of the hexagon
+  radius = across_flats / (2 * cos(30)); // cos(30°) = √3 / 2
+
+  difference() {
+    union() {
+      cylinder(h = height, d = 27);
+      translate([0, 0, thickness])
+        cylinder(h = height - thickness, d = 32);
+    }
+
+    // Outer hexagon shape
+    cylinder(h=thickness, r=radius, $fn=6);
+    
+    cylinder(h = height, d = 5.3);
+  }
+}
+
+module console() {
+//  rotate([0, 0, -centerAngle / 2])
+//    translate([216, 270, 0])
+  
+  difference() 
+  {
+    cube([834.5, 140, thickness]);
+    translate([465, 69, -1])
+      rotate([0, 0, 90])
+        frame_mount_inside();
+        // frame_shape(13, 0, frame_size + [2 * mount_thickness + 0.6, -9.4, frame_height]);
+
+    translate([685, 54, -1])
+      rotate([90, 0, 0])
+        translate([5.5, 48, 22.5])
+          for (i = [0, 1]) for (j = [0, 1])
+            mirror([i, 0, 0])
+              mirror([0, 0, j])
+                translate([18, 0, 18])
+                  rotate([90, 0, 0])
+                    cylinder(70, d = 5.2);
+
+  hull() for (i = [0, 1])
+    translate([100, 75 + i * 43.5, -1])
+      cylinder(10, d = 8);
+
+  }  
+}
+
+// frame_mount_inside();
+
+projection()
+console();
+
+// headlight_switch_cover();
+
+// cam_screen_mount();
+
 // test_stand();
 
+//translate([465, 69, -10])
+//  rotate([0, 0, 90])
+  //  frame_mount();
+
+//translate([0, 0, explode ? 25 : 0])
+//  mount();
+
 /*
-frame_mount();
-
-translate([0, 0, explode ? 25 : 0])
-  mount();
-
 translate([0, 3, explode ? 40 : 0])
   rotate([0, 0, 90])
     cube(pcb_size, center = true);
@@ -221,7 +330,7 @@ translate([0, 3, explode ? 40 : 0])
 
 //translate([-di_mount_size[0] / 2, -di_mount_size[1] / 2 - 27, explode ? 60 : 0])
 //  rotate([180, 0, 90])
-    di_mount();
+//    di_mount();
 
 /*
 translate([do_mount_size[0] / 2 - 10, do_mount_size[1] / 2 + 18, explode ? 77 : 0])

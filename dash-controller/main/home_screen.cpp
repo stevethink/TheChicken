@@ -14,6 +14,8 @@ extern "C"
 #include "esp_err.h"
 }
 
+#include <cmath>
+
 #include "ta_json.hpp"
 
 // #include <stdio.h>
@@ -108,6 +110,7 @@ namespace air_ride
 
     void mode_event_cb(lv_event_t *e);
     void manual_event_cb(lv_event_t *e);
+    void level_event_cb(lv_event_t *e);
 }
 
 namespace status_inputs
@@ -207,6 +210,7 @@ extern "C"
     esp_err_t write_file(const char *filename, const char *data, int datalen);
     int read_file(const char *filename, char *buffer, int bufferlen);
     esp_err_t i2c_master_send_data(uint8_t *data, size_t len);
+    esp_err_t i2c_master_send_str(const char *str);
 
     extern const lv_img_dsc_t temperature_bar_lg;
     extern const lv_img_dsc_t HVAC_icons_bar;
@@ -642,6 +646,11 @@ void air_ride::manual_event_cb(lv_event_t *e)
     i2c_master_send_data((uint8_t *)json_buff.Pch(), json_buff.Len());
 }
 
+void air_ride::level_event_cb(lv_event_t *e)
+{
+    i2c_master_send_str("{\"airRide\":{\"set\":\"level\"}}");
+}
+
 void status_inputs::status_input_t::set(bool on)
 {
     lv_obj_set_style_bg_color(status, lv_palette_darken(on ? LV_PALETTE_RED : LV_PALETTE_GREEN, 4), 0);
@@ -988,6 +997,8 @@ void home_screen(void)
     color_changer_create(t3);
 }
 
+void level_update(float x_g, float y_g);
+
 extern "C"
 {
     void run_home_screen(void)
@@ -1064,6 +1075,8 @@ extern "C"
         }
         else if ((pJToken = json.Root()->Find("airRide")))
         {
+            JToken *pJTokenAirRide = pJToken;
+
             JToken *pJTokenPressure = pJToken->Child()->Find("pressure");
             if (pJTokenPressure && (pJTokenPressure = pJTokenPressure->Child()))
             {
@@ -1090,6 +1103,23 @@ extern "C"
                     lv_label_set_text(air_ride::tank_psi_label, temp_buffer.Pch());
                 }
             }
+
+            JToken *pJTokenAccel = pJTokenAirRide->Child()->Find("accel");
+            if (pJTokenAccel && (pJTokenAccel = pJTokenAccel->Child()))
+            {
+                float x_g = 0;
+                float y_g = 0;
+
+                if ((pJToken = pJTokenAccel->Find("x")))
+                {
+                    x_g = pJToken->ChildValue().StrToFloat();
+                }
+                if ((pJToken = pJTokenAccel->Find("y")))
+                {
+                    y_g = pJToken->ChildValue().StrToFloat();
+                }
+                level_update(x_g, y_g);
+            }            
         }
     }
 }
@@ -1108,6 +1138,69 @@ void home_screen_close(void)
     lv_style_reset(&style_xl);
     lv_style_reset(&style_icon);
     lv_style_reset(&style_bullet);
+}
+
+static lv_obj_t *bubble;
+static int center_x, center_y, max_radius;
+static const float level_range = 2.0; // +/- 2g
+
+void level_update(float x_g, float y_g) {
+    ESP_LOGI(TAG, "Level update: x_g=%.2f, y_g=%.2f", x_g, y_g);
+
+    if (x_g > level_range) x_g = level_range;
+    if (x_g < -level_range) x_g = -level_range;
+    if (y_g > level_range) y_g = level_range;
+    if (y_g < -level_range) y_g = -level_range;
+
+    int bubble_x = (int)((x_g / level_range) * max_radius);
+    int bubble_y = (int)((y_g / level_range) * max_radius);
+
+    /*
+    float dx = bubble_x;
+    float dy = bubble_y;
+    float distance = sqrtf(dx*dx + dy*dy);
+
+    if (distance > max_radius) {
+        float scale = (float)max_radius / distance;
+        bubble_x = (int)(dx * scale);
+        bubble_y = (int)(dy * scale);
+    }
+*/
+    lv_obj_set_pos(bubble, bubble_x, bubble_y);  // 10 = bubble radius
+}
+
+lv_obj_t* create_level_widget(lv_obj_t *parent) {
+    lv_obj_t *cont = lv_obj_create(parent);
+    lv_obj_set_size(cont, 70, 70);
+    lv_obj_center(cont);
+    lv_obj_set_style_radius(cont, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(cont, 4, 0);
+    lv_obj_set_style_border_color(cont, lv_palette_main(LV_PALETTE_GREY), 0);
+
+    // Create the center circle
+    lv_obj_t *center_circle = lv_obj_create(cont);
+    lv_obj_set_size(center_circle, 26, 26);  // center circle size
+    lv_obj_set_style_radius(center_circle, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(center_circle, 2, 0);
+    lv_obj_set_style_border_color(center_circle, lv_palette_main(LV_PALETTE_ORANGE), 0);
+    lv_obj_clear_flag(center_circle, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_center(center_circle);
+
+    center_x = 70 / 2;
+    center_y = 70 / 2;
+    max_radius = 27;
+
+    // Create the bubble
+    bubble = lv_obj_create(cont);
+    lv_obj_set_size(bubble, 20, 20);  // Bubble size
+    lv_obj_set_style_radius(bubble, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(bubble, lv_palette_main(LV_PALETTE_BLUE), 0);
+    lv_obj_clear_flag(bubble, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_align(bubble, LV_ALIGN_CENTER, 0, 0);
+//    lv_obj_set_pos(bubble, center_x - 10, center_y - 10);
+    lv_obj_set_pos(bubble, 0, 0);
+    return cont;
 }
 
 /**********************
@@ -1181,7 +1274,7 @@ static void main_create(lv_obj_t *parent)
     {
         lv_obj_t *status = lv_obj_create(panel);
         lv_obj_add_style(status, &style_indicators, 0);
-        lv_obj_set_size(status, 110, 50); // Size of the square
+        lv_obj_set_size(status, 110, 45); // Size of the square
         status_inputs::status_input[i].status = status;
         if (i == 0) {
             lv_obj_align(status, LV_ALIGN_TOP_MID, 0, 0);
@@ -1197,6 +1290,9 @@ static void main_create(lv_obj_t *parent)
         lv_obj_center(label); // Center the label within the container
         status_inputs::status_input[i].status_label = label;
     }
+
+    lv_obj_t *level_widget = create_level_widget(panel);
+    lv_obj_align_to(level_widget, status_inputs::status_input[status_inputs::input_cnt - 1].status, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
     panel = lv_obj_create(parent);
     lv_obj_set_width(panel, lv_pct(100));
@@ -1306,7 +1402,7 @@ static void main_create(lv_obj_t *parent)
 
     hvac::load();
 
-    i2c_master_send_data((uint8_t *)"{\"req\":\"status\"}", strlen("{\"req\":\"status\"}"));
+    i2c_master_send_str("{\"req\":\"status\"}");
 }
 
 char *encode_action(uint8_t dev_num, const String &button)
@@ -1332,23 +1428,32 @@ void settings_create(lv_obj_t *parent)
     lv_obj_set_flex_flow(main_panel, LV_FLEX_FLOW_ROW_WRAP);
 
     lv_obj_t *title = lv_label_create(main_panel);
-    lv_label_set_text(title, "Servo Config (DO NOT TOUCH!!!)");
+    lv_label_set_text(title, "Config (DO NOT TOUCH!!!)");
     lv_obj_add_style(title, &style_title, 0);
+
+    lv_obj_t *level_btn = lv_btn_create(main_panel);
+    lv_obj_set_size(level_btn, default_btn_width, default_btn_height);
+    lv_obj_set_style_bg_color(level_btn, lv_palette_darken(config::palette, 4), 0);
+    lv_obj_t *level_label = lv_label_create(level_btn);
+    lv_label_set_text(level_label, "Set Level");
+    lv_obj_center(level_label);
+    lv_obj_add_event_cb(level_btn, air_ride::level_event_cb, LV_EVENT_CLICKED, NULL);
 
     for (uint8_t i = 0; i < servos::servo_cnt; i++)
     {
         lv_obj_t *label;
+        lv_obj_t *btn;
         lv_obj_t *panel = lv_obj_create(main_panel);
         lv_obj_set_width(panel, lv_pct(100));
         lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_ROW_WRAP);
-
+/*
         label = lv_label_create(panel);
         temp_buffer = "I/O : ";
         temp_buffer.StrFromInt(i);
         lv_label_set_text(label, temp_buffer.Pch());
         lv_obj_add_style(label, &style_title, 0);
 
-        lv_obj_t *btn = lv_btn_create(panel);
+        btn = lv_btn_create(panel);
         lv_obj_set_height(btn, LV_SIZE_CONTENT);
         lv_obj_set_width(btn, lv_pct(28));
         lv_obj_add_event_cb(btn, relays::btn_event_cb, LV_EVENT_CLICKED, encode_action(i, "on"));
@@ -1365,7 +1470,7 @@ void settings_create(lv_obj_t *parent)
         label = lv_label_create(btn);
         lv_label_set_text(label, "Relay off");
         lv_obj_center(label);
-
+*/
         // Add a spacer to force the next label to a new row
         lv_obj_t *spacer = lv_obj_create(panel);
         lv_obj_set_size(spacer, LV_PCT(100), 0);
