@@ -94,6 +94,32 @@ module di_mount() {
   }
 }
 
+module di_mount_2() {
+  difference() {
+    union() {
+      translate([(pcb_size[0] - di_size[0])/ 2 + 14, mount_size[1] - di_size[1] + 2, 0])
+        cube(di_mount_size + [0, 30, 0]);
+      translate([pcb_size[0]/ 2 + 18, mount_size[1] - di_size[1] / 2 + 17, 0])
+        for (i = [0, 1])
+          for (j = [0, 1])
+            mirror([i, 0, 0])
+              mirror([0, j, 0])
+                translate([43.5, 32, 0])
+                  cylinder(h = di_mount_size[2] + 4, d = 8);
+    }
+    translate([pcb_size[0]/ 2 + 18, mount_size[1] - di_size[1] / 2 + 17, -0.1])
+      for (i = [0, 1])
+        for (j = [0, 1])
+          mirror([i, 0, 0])
+            mirror([0, j, 0])
+              translate([43.5, 32, 0]) {
+                cylinder(h = di_mount_size[2] + 5, d = 3);
+                translate([0, 12, 0])
+                  cylinder(h = di_mount_size[2] + 0.2, d = 3);
+              }
+  }
+}
+
 module do_mount() {
   difference() {
     union() {
@@ -104,6 +130,43 @@ module do_mount() {
           translate([4, 4, -0.1])
             cylinder(mount_thickness + 0.2, d = 3);
         }
+
+      translate([do_mount_size[0] / 2, do_mount_size[1] / 2, 0]) {
+        for (i = [0, 1])
+          for (j = [0, 1])
+            mirror([i, 0, 0])
+              mirror([0, j, 0])
+                translate([do_mount_size[0] / 2 - 6.5, do_mount_size[1] / 2 - mount_thickness, 0]) {
+                  cube([6.5, mount_thickness, 11]);
+                  translate([0, 0, 11])
+                    cube([6.5, 13, mount_thickness]);
+                }
+        }
+    }
+    translate([do_mount_size[0] - 15, do_mount_size[1] + 5, -0.1])
+      cylinder(mount_thickness + 0.2, d = 19.7);
+    translate([do_mount_size[0]/ 2, do_mount_size[1] / 2, -0.1]) {
+      for (i = [0, 1])
+        for (j = [0, 1])
+          mirror([i, 0, 0])
+            mirror([0, j, 0])
+              translate([43.5, 32, 11])
+                cylinder(h = di_mount_size[2] + 0.2, d = 3.4);
+      translate([-11, 0, 0])
+        for (i = [0, 1])
+          for (j = [0, 1])
+            mirror([i, 0, 0])
+              mirror([0, j, 0])
+                translate([32.95, 22.5, 0])
+                  cylinder(h = 20, d = 3);
+    }
+  }
+}
+
+module do_mount_2() {
+  difference() {
+    union() {
+      cube(do_mount_size);
 
       translate([do_mount_size[0] / 2, do_mount_size[1] / 2, 0]) {
         for (i = [0, 1])
@@ -281,13 +344,17 @@ module console() {
   
   difference() 
   {
-    cube([834.5, 140, thickness]);
-    translate([465, 69, -1])
-      rotate([0, 0, 90])
+    union() {
+      cube([834.5, 140, thickness]);
+      translate([432, 140 - 254, 0])
+        cube([834.5 - 432, 254, thickness]);
+    }
+    translate([520, 10, -1])
+      rotate([0, 0, 0])
         frame_mount_inside();
         // frame_shape(13, 0, frame_size + [2 * mount_thickness + 0.6, -9.4, frame_height]);
 
-    translate([685, 54, -1])
+ /*   translate([685, 54, -1])
       rotate([90, 0, 0])
         translate([5.5, 48, 22.5])
           for (i = [0, 1]) for (j = [0, 1])
@@ -296,7 +363,7 @@ module console() {
                 translate([18, 0, 18])
                   rotate([90, 0, 0])
                     cylinder(70, d = 5.2);
-
+*/
   hull() for (i = [0, 1])
     translate([100, 75 + i * 43.5, -1])
       cylinder(10, d = 8);
@@ -306,8 +373,18 @@ module console() {
 
 // frame_mount_inside();
 
-projection()
+projection() {
 console();
+
+translate([-36, -244, 0])
+  cube([457, 229, thickness]);
+
+translate([-278, -244, 0])
+  cube([229, 356, thickness]);
+}
+
+//translate([834.5 - 533, -30, 0])
+// cube([432, 20, 20]);
 
 // headlight_switch_cover();
 
@@ -330,7 +407,10 @@ translate([0, 3, explode ? 40 : 0])
 
 //translate([-di_mount_size[0] / 2, -di_mount_size[1] / 2 - 27, explode ? 60 : 0])
 //  rotate([180, 0, 90])
-//    di_mount();
+
+// di_mount_2();
+
+// do_mount_2();
 
 /*
 translate([do_mount_size[0] / 2 - 10, do_mount_size[1] / 2 + 18, explode ? 77 : 0])
